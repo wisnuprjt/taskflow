@@ -9,3 +9,7 @@ vendor/
 Thumbs.db
 .idea/
 .vscode/
+
+# AI assistant guideline files (local only)
+AGENTS.md
+CLAUDE.md
