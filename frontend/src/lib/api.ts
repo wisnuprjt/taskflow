@@ -93,14 +93,17 @@ export function uploadFile<T>(path: string, file: File, onProgress: (percent: nu
   });
 }
 
-/** Downloads need the Bearer header, so fetch as a blob and trigger a save. */
-export async function downloadFile(url: string, fileName: string): Promise<void> {
+/** Private files need the Bearer header, so they are fetched as blobs (not plain <a>/<img> URLs). */
+export async function fetchBlob(url: string): Promise<Blob> {
   const token = tokenStore.get();
   const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
   if (res.status === 401) handleUnauthorized();
   if (!res.ok) throw toApiError(res.status, await res.json().catch(() => null));
+  return res.blob();
+}
 
-  const href = URL.createObjectURL(await res.blob());
+export async function downloadFile(url: string, fileName: string): Promise<void> {
+  const href = URL.createObjectURL(await fetchBlob(url));
   const a = Object.assign(document.createElement("a"), { href, download: fileName });
   a.click();
   URL.revokeObjectURL(href);

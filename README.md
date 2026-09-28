@@ -68,7 +68,7 @@ npm run dev
 
 | Email | Password | Role |
 |---|---|---|
-| admin@example.com | password | admin |
+| admin@example.com | password | admin |  
 | user@example.com | password | member |
 
 The seeder also creates 4 random members, 20 tasks and 30 comments.

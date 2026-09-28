@@ -6,6 +6,7 @@ import { ConfirmDialog } from "@/components/ui/Modal";
 import { api, ApiError, downloadFile } from "@/lib/api";
 import { formatBytes, formatDate } from "@/lib/format";
 import type { Attachment } from "@/lib/types";
+import { AttachmentThumb } from "./AttachmentThumb";
 
 interface Props {
   attachments: Attachment[];
@@ -48,11 +49,14 @@ export function AttachmentList({ attachments, canDelete, onDeleted }: Props) {
       <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
         {attachments.map((a) => (
           <li key={a.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
-            <div className="min-w-0">
-              <p className="truncate font-medium text-slate-800">{a.file_name}</p>
-              <p className="text-xs text-slate-500">
-                {formatBytes(a.file_size)} · {formatDate(a.uploaded_at, true)}
-              </p>
+            <div className="flex min-w-0 items-center gap-3">
+              <AttachmentThumb attachment={a} />
+              <div className="min-w-0">
+                <p className="truncate font-medium text-slate-800">{a.file_name}</p>
+                <p className="text-xs text-slate-500">
+                  {formatBytes(a.file_size)} · {formatDate(a.uploaded_at, true)}
+                </p>
+              </div>
             </div>
             <div className="flex shrink-0 gap-3">
               <button onClick={() => download(a)} className="font-medium text-indigo-600 hover:text-indigo-800">

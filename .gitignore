@@ -10,6 +10,13 @@ Thumbs.db
 .idea/
 .vscode/
 
+# Local media (demo recordings, test upload files)
+*.mp4
+*.webm
+*.mov
+*.mkv
+*.avi
+
 # AI assistant guideline files (local only)
 AGENTS.md
 CLAUDE.md
