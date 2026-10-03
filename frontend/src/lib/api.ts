@@ -63,7 +63,12 @@ export async function api<T>(path: string, options: { method?: string; body?: un
 }
 
 /** Multipart upload via XHR so we can report upload progress (fetch cannot). */
-export function uploadFile<T>(path: string, file: File, onProgress: (percent: number) => void): Promise<T> {
+export function uploadFile<T>(
+  path: string,
+  file: Blob,
+  onProgress: (percent: number) => void,
+  fields: Record<string, string> = {},
+): Promise<T> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", API_URL + path);
@@ -88,9 +93,46 @@ export function uploadFile<T>(path: string, file: File, onProgress: (percent: nu
     };
 
     const form = new FormData();
+    Object.entries(fields).forEach(([key, value]) => form.append(key, value));
     form.append("file", file);
     xhr.send(form);
   });
+}
+
+const CHUNK_RETRIES = 3;
+
+/**
+ * Files above the single-request limit go up in server-sized chunks (init -> chunks -> complete).
+ * A failed chunk is retried on its own instead of restarting the whole file.
+ */
+export async function uploadChunked<T>(taskId: number, file: File, onProgress: (percent: number) => void): Promise<T> {
+  const init = await api<{ upload_id: string; chunk_size: number; total_chunks: number }>(`/tasks/${taskId}/attachments/chunked`, {
+    method: "POST",
+    body: { file_name: file.name, file_size: file.size },
+  });
+  const base = `/uploads/${init.upload_id}`;
+
+  try {
+    for (let index = 0; index < init.total_chunks; index++) {
+      const start = index * init.chunk_size;
+      const chunk = file.slice(start, start + init.chunk_size);
+      const report = (percent: number) => onProgress(Math.round(((start + (chunk.size * percent) / 100) / file.size) * 100));
+
+      for (let attempt = 1; ; attempt++) {
+        try {
+          await uploadFile(`${base}/chunks`, chunk, report, { index: String(index) });
+          break;
+        } catch (err) {
+          // Only network errors (status 0) are worth retrying; validation/auth errors will not change.
+          if ((err as ApiError).status !== 0 || attempt === CHUNK_RETRIES) throw err;
+        }
+      }
+    }
+    return await api<T>(`${base}/complete`, { method: "POST" });
+  } catch (err) {
+    api(base, { method: "DELETE" }).catch(() => undefined); // best-effort cleanup of stored chunks
+    throw err;
+  }
 }
 
 /** Private files need the Bearer header, so they are fetched as blobs (not plain <a>/<img> URLs). */

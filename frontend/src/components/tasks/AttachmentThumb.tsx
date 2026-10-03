@@ -17,14 +17,15 @@ const BOX = "flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden
 
 /** Small preview: the image itself for image files, a coloured extension badge otherwise. */
 export function AttachmentThumb({ attachment }: { attachment: Attachment }) {
-  const isImage = attachment.mime_type.startsWith("image/");
+  const isImage = attachment.mime_type.startsWith("image/") && attachment.scan_status === "clean";
   const [src, setSrc] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isImage) return;
     let url: string | null = null;
     let cancelled = false;
-    fetchBlob(attachment.download_url)
+    // Prefer the small server thumbnail; fall back to the original right after upload.
+    fetchBlob(attachment.thumbnail_url ?? attachment.download_url)
       .then((blob) => {
         if (cancelled) return;
         url = URL.createObjectURL(blob);
@@ -35,7 +36,7 @@ export function AttachmentThumb({ attachment }: { attachment: Attachment }) {
       cancelled = true;
       if (url) URL.revokeObjectURL(url);
     };
-  }, [isImage, attachment.download_url]);
+  }, [isImage, attachment.thumbnail_url, attachment.download_url]);
 
   if (isImage && src) {
     // eslint-disable-next-line @next/next/no-img-element -- blob: URL, next/image cannot optimise it

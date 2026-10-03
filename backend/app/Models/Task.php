@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Jobs\ScanAttachment;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use Database\Factories\TaskFactory;
@@ -34,7 +35,10 @@ class Task extends Model
     {
         // DB rows cascade via FK, but the physical files must be removed explicitly.
         static::deleting(function (Task $task) {
-            Storage::disk(TaskAttachment::DISK)->delete($task->attachments()->pluck('file_path')->all());
+            $attachments = $task->attachments()->get(['file_path', 'thumbnail_path']);
+            Storage::disk(TaskAttachment::DISK)->delete(
+                $attachments->flatMap(fn ($a) => [$a->file_path, $a->thumbnail_path])->filter()->all()
+            );
         });
     }
 
@@ -51,6 +55,33 @@ class Task extends Model
     public function attachments(): HasMany
     {
         return $this->hasMany(TaskAttachment::class);
+    }
+
+    /**
+     * Stores an uploaded file as the next version of its file name and queues the virus scan
+     * (thumbnail generation is chained from the scan, so unscanned files are never processed).
+     */
+    public function addAttachment(string $name, string $path, int $size, string $mime): TaskAttachment
+    {
+        $attachment = $this->attachments()->create([
+            'file_name' => $name,
+            'version' => ($this->attachments()->where('file_name', $name)->max('version') ?? 0) + 1,
+            'file_path' => $path,
+            'file_size' => $size,
+            'mime_type' => $mime,
+        ]);
+
+        ScanAttachment::dispatch($attachment);
+
+        return $attachment->refresh();
+    }
+
+    /** Only the newest version of each file name; older versions stay reachable via /versions. */
+    public function latestAttachments(): HasMany
+    {
+        return $this->attachments()->whereRaw(
+            'version = (select max(v.version) from task_attachments v where v.task_id = task_attachments.task_id and v.file_name = task_attachments.file_name)'
+        );
     }
 
     public function comments(): HasMany

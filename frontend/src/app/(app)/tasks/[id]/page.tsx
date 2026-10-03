@@ -8,6 +8,7 @@ import { AttachmentUploader } from "@/components/tasks/AttachmentUploader";
 import { CommentSection } from "@/components/tasks/CommentSection";
 import { DeleteTaskDialog } from "@/components/tasks/DeleteTaskDialog";
 import { TaskFormModal } from "@/components/tasks/TaskFormModal";
+import { useScanStatusPolling } from "@/components/tasks/useScanStatusPolling";
 import { PriorityBadge, StatusBadge } from "@/components/ui/Badges";
 import { Button } from "@/components/ui/Button";
 import { PageLoader } from "@/components/ui/Spinner";
@@ -43,6 +44,8 @@ export default function TaskDetailPage() {
   }, [id]);
 
   useEffect(load, [load]);
+
+  useScanStatusPolling(task?.id, task?.attachments ?? [], (latest) => setTask((t) => t && { ...t, attachments: latest }));
 
   if (error) return <ErrorState message={error} onRetry={load} />;
   if (!task) return <PageLoader />;

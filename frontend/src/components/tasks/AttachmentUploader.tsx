@@ -2,12 +2,14 @@
 
 import { useRef, useState, type DragEvent } from "react";
 import { useToast } from "@/components/providers/ToastProvider";
-import { ApiError, uploadFile } from "@/lib/api";
+import { ApiError, uploadChunked, uploadFile } from "@/lib/api";
 import type { Attachment } from "@/lib/types";
 
 // Mirrors backend StoreAttachmentRequest for instant feedback; the server remains the source of truth.
 const ALLOWED = ["jpg", "jpeg", "png", "webp", "pdf", "doc", "docx", "xlsx", "txt", "mp4", "webm"];
+/** Single-request limit; larger files are sent in chunks up to CHUNKED_MAX_BYTES. */
 const MAX_BYTES = 20 * 1024 * 1024;
+const CHUNKED_MAX_BYTES = 500 * 1024 * 1024;
 
 interface Upload {
   id: number;
@@ -27,7 +29,7 @@ export function AttachmentUploader({ taskId, onUploaded }: { taskId: number; onU
   function validate(file: File): string | null {
     const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
     if (!ALLOWED.includes(ext)) return `File type .${ext} is not allowed.`;
-    if (file.size > MAX_BYTES) return "File exceeds the 20 MB limit.";
+    if (file.size > CHUNKED_MAX_BYTES) return "File exceeds the 500 MB limit.";
     return null;
   }
 
@@ -38,13 +40,17 @@ export function AttachmentUploader({ taskId, onUploaded }: { taskId: number; onU
     if (error) return;
 
     try {
-      const res = await uploadFile<{ data: Attachment }>(`/tasks/${taskId}/attachments`, file, (progress) => patch(id, { progress }));
+      const onProgress = (progress: number) => patch(id, { progress });
+      const res =
+        file.size > MAX_BYTES
+          ? await uploadChunked<{ data: Attachment }>(taskId, file, onProgress)
+          : await uploadFile<{ data: Attachment }>(`/tasks/${taskId}/attachments`, file, onProgress);
       onUploaded(res.data);
       toast(`Uploaded ${file.name}`);
       setUploads((all) => all.filter((u) => u.id !== id));
     } catch (err) {
       const apiErr = err as ApiError;
-      patch(id, { error: apiErr.errors?.file?.[0] ?? apiErr.message });
+      patch(id, { error: Object.values(apiErr.errors ?? {})[0]?.[0] ?? apiErr.message });
     }
   }
 
@@ -76,7 +82,7 @@ export function AttachmentUploader({ taskId, onUploaded }: { taskId: number; onU
         }`}
       >
         <p className="font-medium">Drag & drop files here, or click to browse</p>
-        <p className="mt-1 text-xs">Images, PDF, Office docs, TXT, MP4/WebM · max 20 MB</p>
+        <p className="mt-1 text-xs">Images, PDF, Office docs, TXT, MP4/WebM · max 500 MB (files over 20 MB upload in chunks)</p>
         <input
           ref={inputRef}
           type="file"

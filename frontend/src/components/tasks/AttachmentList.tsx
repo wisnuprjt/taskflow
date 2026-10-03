@@ -8,6 +8,11 @@ import { formatBytes, formatDate } from "@/lib/format";
 import type { Attachment } from "@/lib/types";
 import { AttachmentThumb } from "./AttachmentThumb";
 
+const SCAN_BADGE = {
+  pending: { label: "Scanning…", className: "bg-amber-50 text-amber-700" },
+  infected: { label: "Quarantined", className: "bg-red-50 text-red-700" },
+};
+
 interface Props {
   attachments: Attachment[];
   canDelete: boolean;
@@ -52,14 +57,25 @@ export function AttachmentList({ attachments, canDelete, onDeleted }: Props) {
             <div className="flex min-w-0 items-center gap-3">
               <AttachmentThumb attachment={a} />
               <div className="min-w-0">
-                <p className="truncate font-medium text-slate-800">{a.file_name}</p>
+                <p className="truncate font-medium text-slate-800">
+                  {a.file_name}
+                  {a.scan_status !== "clean" && (
+                    <span className={`ml-2 rounded px-1.5 py-0.5 text-[10px] font-semibold ${SCAN_BADGE[a.scan_status].className}`}>
+                      {SCAN_BADGE[a.scan_status].label}
+                    </span>
+                  )}
+                </p>
                 <p className="text-xs text-slate-500">
                   {formatBytes(a.file_size)} · {formatDate(a.uploaded_at, true)}
                 </p>
               </div>
             </div>
             <div className="flex shrink-0 gap-3">
-              <button onClick={() => download(a)} className="font-medium text-indigo-600 hover:text-indigo-800">
+              <button
+                onClick={() => download(a)}
+                disabled={a.scan_status !== "clean"}
+                className="font-medium text-indigo-600 hover:text-indigo-800 disabled:cursor-not-allowed disabled:text-slate-300"
+              >
                 Download
               </button>
               {canDelete && (

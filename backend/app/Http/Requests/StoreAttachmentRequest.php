@@ -17,3 +17,5 @@ class StoreAttachmentRequest extends FormRequest
         ];
     }
 }
+
+ //Seluruh file yang diunggah harus memiliki salah satu dari ekstensi berikut: jpg, jpeg, png, webp, pdf, doc, docx, xlsx, txt, mp4, webm. Ukuran maksimum file yang diizinkan adalah 20480 KB (20 MB).

@@ -15,7 +15,10 @@ export interface Attachment {
   file_name: string;
   file_size: number;
   mime_type: string;
+  scan_status: "pending" | "clean" | "infected";
   download_url: string;
+  /** Server-generated preview; null for non-images or while the job is still running. */
+  thumbnail_url: string | null;
   uploaded_at: string;
 }
 

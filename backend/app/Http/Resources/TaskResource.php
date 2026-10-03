@@ -22,7 +22,7 @@ class TaskResource extends JsonResource
             'creator' => UserResource::make($this->whenLoaded('creator')),
             'attachments_count' => $this->whenCounted('attachments'),
             'comments_count' => $this->whenCounted('comments'),
-            'attachments' => TaskAttachmentResource::collection($this->whenLoaded('attachments')),
+            'attachments' => TaskAttachmentResource::collection($this->whenLoaded('latestAttachments')),
             // Lets the UI hide actions the current user is not allowed to perform.
             'can' => [
                 'update' => $request->user()?->can('update', $this->resource) ?? false,

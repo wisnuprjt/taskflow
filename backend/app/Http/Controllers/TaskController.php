@@ -17,7 +17,7 @@ class TaskController extends Controller
     {
         $tasks = Task::query()
             ->with(['assignee', 'creator'])
-            ->withCount(['attachments', 'comments'])
+            ->withCount(['latestAttachments as attachments_count', 'comments'])
             ->filter($request->validated())
             ->paginate($request->integer('per_page', 15))
             ->withQueryString();
@@ -34,7 +34,7 @@ class TaskController extends Controller
 
     public function show(Task $task): TaskResource
     {
-        return TaskResource::make($task->load(['assignee', 'creator', 'attachments'])->loadCount(['attachments', 'comments']));
+        return TaskResource::make($task->load(['assignee', 'creator', 'latestAttachments'])->loadCount(['latestAttachments as attachments_count', 'comments']));
     }
 
     public function update(UpdateTaskRequest $request, Task $task): TaskResource
