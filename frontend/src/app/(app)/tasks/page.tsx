@@ -1,6 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useAuth } from "@/components/providers/AuthProvider";
+import { useToast } from "@/components/providers/ToastProvider";
+import { useChannelEvent } from "@/components/realtime/useChannelEvent";
 import { DeleteTaskDialog } from "@/components/tasks/DeleteTaskDialog";
 import { TaskFilters, type Filters } from "@/components/tasks/TaskFilters";
 import { TaskFormModal } from "@/components/tasks/TaskFormModal";
@@ -10,7 +13,7 @@ import { Pagination } from "@/components/ui/Pagination";
 import { PageLoader } from "@/components/ui/Spinner";
 import { EmptyState, ErrorState } from "@/components/ui/States";
 import { api, ApiError } from "@/lib/api";
-import type { Paginated, Task } from "@/lib/types";
+import type { Paginated, Task, TaskChangedEvent } from "@/lib/types";
 
 const PER_PAGE = 10;
 const DEFAULT_FILTERS: Filters = { search: "", status: "", priority: "", sort: "-created_at" };
@@ -33,10 +36,23 @@ export default function TasksPage() {
   }, [filters.search]);
 
   const { status, priority, sort } = filters;
+  const { user } = useAuth();
 
-  const requestKey = JSON.stringify([page, search, status, priority, sort, reloads]);
+  // The role is part of the key: permissions (`can`) in the response change with it.
+  const requestKey = JSON.stringify([page, search, status, priority, sort, reloads, user?.role]);
   const loading = settledKey !== requestKey;
   const reload = useCallback(() => setReloads((n) => n + 1), []);
+
+  // Someone (maybe in another tab) changed a task: re-run the current query so filters, sorting,
+  // pagination and per-user permissions all stay correct. Only other people's changes get a toast.
+  const toast = useToast();
+  const onTaskChanged = (verb: string) => (e: TaskChangedEvent) => {
+    reload();
+    if (e.actor.id !== user?.id) toast(`${e.actor.name} ${verb} "${e.title}"`);
+  };
+  useChannelEvent("tasks", ".task.created", onTaskChanged("created"));
+  useChannelEvent("tasks", ".task.updated", onTaskChanged("updated"));
+  useChannelEvent("tasks", ".task.deleted", onTaskChanged("deleted"));
 
   useEffect(() => {
     let stale = false; // ignore responses that arrive after the query changed

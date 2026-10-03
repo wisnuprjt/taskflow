@@ -2,7 +2,9 @@
 
 namespace App\Jobs;
 
+use App\Events\AttachmentChanged;
 use App\Models\TaskAttachment;
+use App\Support\Realtime;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -45,12 +47,14 @@ class ScanAttachment implements ShouldQueue
             // Quarantine: drop the file but keep the row so the user sees why it is gone.
             $disk->delete($this->attachment->file_path);
             $this->attachment->update(['scan_status' => TaskAttachment::SCAN_INFECTED]);
+            Realtime::broadcast(new AttachmentChanged($this->attachment, AttachmentChanged::SCANNED));
             Log::warning('Attachment quarantined', ['attachment_id' => $this->attachment->id, 'threat' => $threat]);
 
             return;
         }
 
         $this->attachment->update(['scan_status' => TaskAttachment::SCAN_CLEAN]);
+        Realtime::broadcast(new AttachmentChanged($this->attachment, AttachmentChanged::SCANNED));
 
         if (str_starts_with($this->attachment->mime_type, 'image/')) {
             GenerateThumbnail::dispatch($this->attachment);

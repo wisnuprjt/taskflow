@@ -4,6 +4,9 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/AuthProvider";
+import { LiveIndicator } from "@/components/realtime/LiveIndicator";
+import { OnlineUsers } from "@/components/realtime/OnlineUsers";
+import { useUserChannel } from "@/components/realtime/useUserChannel";
 import { Button } from "@/components/ui/Button";
 import { PageLoader } from "@/components/ui/Spinner";
 
@@ -15,6 +18,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!loading && !user) router.replace("/login");
   }, [loading, user, router]);
+
+  useUserChannel(user?.id);
 
   if (loading || !user) return <PageLoader />;
 
@@ -33,6 +38,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             TaskFlow
           </Link>
           <div className="flex items-center gap-3 text-sm">
+            <LiveIndicator />
+            <OnlineUsers />
             <span className="hidden text-slate-600 sm:inline">
               {user.name} <span className="text-slate-400">({user.role})</span>
             </span>

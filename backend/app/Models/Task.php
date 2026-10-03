@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
-use App\Jobs\ScanAttachment;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
+use App\Events\AttachmentChanged;
+use App\Jobs\ScanAttachment;
+use App\Support\Realtime;
 use Database\Factories\TaskFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -71,6 +73,7 @@ class Task extends Model
             'mime_type' => $mime,
         ]);
 
+        Realtime::broadcast(new AttachmentChanged($attachment->refresh(), AttachmentChanged::UPLOADED));
         ScanAttachment::dispatch($attachment);
 
         return $attachment->refresh();

@@ -22,6 +22,21 @@ export interface Attachment {
   uploaded_at: string;
 }
 
+/** Broadcast on `tasks` and `task.{id}`; carries no task data, clients re-fetch with their own token. */
+export interface TaskChangedEvent {
+  task_id: number;
+  title: string;
+  actor: { id: number; name: string };
+}
+
+/** Broadcast on `task.{id}` whenever one of its attachments changes. */
+export interface AttachmentChangedEvent {
+  action: "uploaded" | "deleted" | "scanned" | "thumbnail_ready";
+  attachment_id: number;
+  file_name: string;
+  scan_status: Attachment["scan_status"];
+}
+
 export interface Task {
   id: number;
   title: string;

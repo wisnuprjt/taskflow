@@ -4,6 +4,8 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Enums\UserRole;
+use App\Events\RoleChanged;
+use App\Support\Realtime;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -32,6 +34,17 @@ class User extends Authenticatable implements JWTSubject
             'password' => 'hashed',
             'role' => UserRole::class,
         ];
+    }
+
+    protected static function booted(): void
+    {
+        // On the model, so every Eloquent path (artisan user:role, tinker, a future admin page) notifies the user.
+        // A raw SQL UPDATE bypasses Eloquent and cannot be detected.
+        static::updated(function (User $user) {
+            if ($user->wasChanged('role')) {
+                Realtime::broadcast(new RoleChanged($user));
+            }
+        });
     }
 
     public function isAdmin(): bool

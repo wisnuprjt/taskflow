@@ -2,7 +2,9 @@
 
 namespace App\Jobs;
 
+use App\Events\AttachmentChanged;
 use App\Models\TaskAttachment;
+use App\Support\Realtime;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Storage;
@@ -58,5 +60,6 @@ class GenerateThumbnail implements ShouldQueue
         $disk->put($path, $data);
 
         $this->attachment->update(['thumbnail_path' => $path]);
+        Realtime::broadcast(new AttachmentChanged($this->attachment, AttachmentChanged::THUMBNAIL_READY));
     }
 }

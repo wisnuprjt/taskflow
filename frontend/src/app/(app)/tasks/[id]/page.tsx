@@ -1,21 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { useAuth } from "@/components/providers/AuthProvider";
+import { useToast } from "@/components/providers/ToastProvider";
+import { useChannelEvent } from "@/components/realtime/useChannelEvent";
+import { usePresence } from "@/components/realtime/usePresence";
 import { AttachmentList } from "@/components/tasks/AttachmentList";
 import { AttachmentUploader } from "@/components/tasks/AttachmentUploader";
 import { CommentSection } from "@/components/tasks/CommentSection";
 import { DeleteTaskDialog } from "@/components/tasks/DeleteTaskDialog";
 import { TaskFormModal } from "@/components/tasks/TaskFormModal";
-import { useScanStatusPolling } from "@/components/tasks/useScanStatusPolling";
 import { PriorityBadge, StatusBadge } from "@/components/ui/Badges";
 import { Button } from "@/components/ui/Button";
 import { PageLoader } from "@/components/ui/Spinner";
 import { ErrorState } from "@/components/ui/States";
 import { api, ApiError } from "@/lib/api";
 import { formatDate } from "@/lib/format";
-import type { Task } from "@/lib/types";
+import type { AttachmentChangedEvent, Task, TaskChangedEvent } from "@/lib/types";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -34,6 +37,9 @@ export default function TaskDetailPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Task | null>(null);
 
+  const { user } = useAuth();
+  const role = user?.role;
+
   const load = useCallback(() => {
     api<{ data: Task }>(`/tasks/${id}`)
       .then((res) => {
@@ -45,7 +51,33 @@ export default function TaskDetailPage() {
 
   useEffect(load, [load]);
 
-  useScanStatusPolling(task?.id, task?.attachments ?? [], (latest) => setTask((t) => t && { ...t, attachments: latest }));
+  // Re-fetch when the role changes (realtime): the task's `can` permissions depend on it.
+  const loadedRole = useRef(role);
+  useEffect(() => {
+    if (loadedRole.current === role) return;
+    loadedRole.current = role;
+    load();
+  }, [role, load]);
+
+  const toast = useToast();
+  // Other people who have this task open right now (the presence channel also carries typing whispers).
+  const viewers = usePresence(`task-viewers.${id}`).filter((m) => m.id !== user?.id);
+  useChannelEvent<TaskChangedEvent>(`task.${id}`, ".task.updated", (e) => {
+    load();
+    if (e.actor.id !== user?.id) toast(`${e.actor.name} updated this task.`);
+  });
+  useChannelEvent<TaskChangedEvent>(`task.${id}`, ".task.deleted", (e) => {
+    if (e.actor.id === user?.id) return; // our own delete already navigates away
+    toast(`${e.actor.name} deleted this task.`, "error");
+    router.replace("/tasks");
+  });
+  // Uploads, deletes, scan results and thumbnails: re-fetch so only the latest version of each file shows.
+  useChannelEvent<AttachmentChangedEvent>(`task.${id}`, ".attachment.changed", (e) => {
+    load();
+    if (e.action !== "scanned") return;
+    if (e.scan_status === "clean") toast(`${e.file_name} passed the virus scan.`);
+    else toast(`${e.file_name} was quarantined by the virus scan.`, "error");
+  });
 
   if (error) return <ErrorState message={error} onRetry={load} />;
   if (!task) return <PageLoader />;
@@ -65,6 +97,12 @@ export default function TaskDetailPage() {
               <StatusBadge status={task.status} />
               <PriorityBadge priority={task.priority} />
             </div>
+            {viewers.length > 0 && (
+              <p className="mt-2 flex items-center gap-1.5 text-xs text-slate-500">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                Also viewing: {viewers.map((v) => v.name).join(", ")}
+              </p>
+            )}
           </div>
           <div className="flex gap-2">
             {task.can.update && (

@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\CommentCreated;
 use App\Http\Requests\StoreCommentRequest;
 use App\Http\Resources\TaskCommentResource;
 use App\Models\Task;
+use App\Support\Realtime;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class TaskCommentController extends Controller
@@ -21,6 +23,8 @@ class TaskCommentController extends Controller
             'comment' => $request->validated('comment'),
         ]);
 
-        return TaskCommentResource::make($comment->load('user'));
+        Realtime::broadcast(new CommentCreated($comment->load('user')));
+
+        return TaskCommentResource::make($comment);
     }
 }

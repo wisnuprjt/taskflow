@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\AttachmentChanged;
 use App\Http\Requests\StoreAttachmentRequest;
 use App\Http\Resources\TaskAttachmentResource;
 use App\Models\Task;
 use App\Models\TaskAttachment;
+use App\Support\Realtime;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Gate;
@@ -67,6 +69,7 @@ class TaskAttachmentController extends Controller
         Gate::authorize('update', $attachment->task);
 
         $attachment->delete();
+        Realtime::broadcast(new AttachmentChanged($attachment, AttachmentChanged::DELETED));
 
         return response()->noContent();
     }
