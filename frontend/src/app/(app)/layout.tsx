@@ -27,7 +27,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <>
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
-          <Link href="/tasks" className="font-bold text-indigo-600">
+          <Link href="/tasks" className="flex items-center gap-2 font-bold text-indigo-600">
+            {/* eslint-disable-next-line @next/next/no-img-element -- .ico favicon, next/image cannot optimise it */}
+            <img src="/favicon.ico" alt="" className="h-6 w-6" />
             TaskFlow
           </Link>
           <div className="flex items-center gap-3 text-sm">

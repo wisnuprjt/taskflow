@@ -59,9 +59,11 @@ export default function LoginPage() {
           </Button>
         </form>
 
-        <p className="mt-4 text-center text-xs text-slate-500">
-          Demo: admin@example.com / password · user@example.com / password
-        </p>
+        <div className="mt-4 text-center text-xs text-slate-500">
+          <p className="mb-1 font-medium text-slate-600">Demo Account :</p>
+          <p>wisnu@transcosmos.com / password (admin)</p>
+          <p>wisnu2@transcosmos.com / password (member)</p>
+        </div>
       </div>
     </main>
   );

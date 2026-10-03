@@ -20,6 +20,8 @@ class DatabaseSeeder extends Seeder
         $users = collect([
             User::factory()->admin()->create(['name' => 'Admin Demo', 'email' => 'admin@example.com']),
             User::factory()->create(['name' => 'User Demo', 'email' => 'user@example.com']),
+            User::factory()->create(['name' => 'Wisnu', 'email' => 'wisnu@transcosmos.com']),
+            User::factory()->create(['name' => 'Wisnu 2', 'email' => 'wisnu2@transcosmos.com']),
         ])->merge(User::factory(4)->create());
 
         $tasks = Task::factory(20)
