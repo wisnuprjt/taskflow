@@ -2,40 +2,27 @@
 
 namespace Database\Seeders;
 
-use App\Models\Task;
-use App\Models\TaskComment;
-use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 
 class DatabaseSeeder extends Seeder
 {
     use WithoutModelEvents;
 
     /**
-     * Seed the application's database.
+     * Seeds a fixed demo dataset (data/demo.json): 8 users, 29 tasks and 30 comments.
+     * Fixed instead of random so `migrate --seed`, database/database.sql and the demo all show
+     * the same ids, titles and accounts. Factories are still used by the tests.
+     * Attachments are not seeded: their files live in storage, which is not part of the repo.
      */
     public function run(): void
     {
-        $users = collect([
-            User::factory()->admin()->create(['name' => 'Admin Demo', 'email' => 'admin@example.com']),
-            User::factory()->create(['name' => 'User Demo', 'email' => 'user@example.com']),
-            User::factory()->create(['name' => 'Wisnu', 'email' => 'wisnu@transcosmos.com']),
-            User::factory()->create(['name' => 'Wisnu 2', 'email' => 'wisnu2@transcosmos.com']),
-        ])->merge(User::factory(4)->create());
+        $data = json_decode(file_get_contents(__DIR__.'/data/demo.json'), true, flags: JSON_THROW_ON_ERROR);
 
-        $tasks = Task::factory(20)
-            ->sequence(fn () => [
-                'created_by' => $users->random()->id,
-                'assigned_user_id' => fake()->boolean(80) ? $users->random()->id : null,
-            ])
-            ->create();
-
-        TaskComment::factory(30)
-            ->sequence(fn () => [
-                'task_id' => $tasks->random()->id,
-                'user_id' => $users->random()->id,
-            ])
-            ->create();
+        // Explicit ids keep foreign keys valid; insert in FK order.
+        foreach (['users', 'tasks', 'task_comments'] as $table) {
+            DB::table($table)->insert($data[$table]);
+        }
     }
 }
