@@ -1,0 +1,110 @@
+@startuml use-case
+' Use Case Diagram - TaskFlow (Task Management Platform)
+' Only features implemented in the code are drawn here.
+' See documentation/use-case.md for the use case table and excluded features.
+
+left to right direction
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam defaultFontName Arial
+skinparam ArrowColor #475569
+skinparam ActorBorderColor #334155
+skinparam ActorBackgroundColor #F1F5F9
+skinparam usecase {
+  BackgroundColor #EEF2FF
+  BorderColor #4F46E5
+}
+skinparam usecase<<admin>> {
+  BackgroundColor #FEF3C7
+  BorderColor #D97706
+}
+skinparam package {
+  BackgroundColor #FFFFFF
+  BorderColor #CBD5E1
+}
+hide stereotype
+
+title Use Case Diagram - TaskFlow
+
+actor "Member" as Member
+actor "Admin" as Admin
+
+' Admin inherits every Member use case
+Member <|- Admin
+
+rectangle "TaskFlow" {
+
+  package "Autentikasi" {
+    usecase "Login" as UC01
+    usecase "Logout" as UC02
+    usecase "Melihat Info Akun" as UC03
+  }
+
+  package "Task" {
+    usecase "Melihat Daftar Task" as UC04
+    usecase "Mencari Task" as UC05
+    usecase "Memfilter Task\n(status, priority)" as UC06
+    usecase "Mengurutkan Task" as UC07
+    usecase "Melihat Detail Task" as UC08
+    usecase "Membuat Task" as UC09
+    usecase "Menugaskan Task\nke Pengguna" as UC10
+    usecase "Mengubah Task Sendiri /\nyang Ditugaskan" as UC11
+    usecase "Mengubah Task\nSiapa Pun" as UC12 <<admin>>
+    usecase "Menghapus Task Sendiri" as UC13
+    usecase "Menghapus Task\nSiapa Pun" as UC14 <<admin>>
+  }
+
+  package "Lampiran" {
+    usecase "Melihat Lampiran\n(dengan pratinjau)" as UC15
+    usecase "Mengunduh Lampiran" as UC16
+    usecase "Mengelola Lampiran\nTask Sendiri / yang Ditugaskan\n(unggah, hapus)" as UC17
+    usecase "Mengelola Lampiran\nTask Siapa Pun\n(unggah, hapus)" as UC18 <<admin>>
+    usecase "Memvalidasi File\n(tipe, maks 20 MB)" as UC19
+  }
+
+  package "Komentar" {
+    usecase "Melihat Komentar" as UC20
+    usecase "Menambah Komentar" as UC21
+  }
+}
+
+' --- Member ---
+Member --> UC01
+Member --> UC02
+Member --> UC03
+Member --> UC04
+Member --> UC08
+Member --> UC09
+Member --> UC11
+Member --> UC13
+Member --> UC16
+Member --> UC17
+Member --> UC20
+Member --> UC21
+
+' --- Admin (scope: all tasks) ---
+Admin --> UC12
+Admin --> UC14
+Admin --> UC18
+
+' --- extend: optional behaviour ---
+UC05 ..> UC04 : <<extend>>
+UC06 ..> UC04 : <<extend>>
+UC07 ..> UC04 : <<extend>>
+UC10 ..> UC09 : <<extend>>
+UC10 ..> UC11 : <<extend>>
+UC10 ..> UC12 : <<extend>>
+
+' --- include: always happens ---
+UC08 ..> UC15 : <<include>>
+UC17 ..> UC19 : <<include>>
+UC18 ..> UC19 : <<include>>
+
+legend right
+  | Warna | Arti |
+  |<#EEF2FF> | Use case Member (Admin juga mewarisinya) |
+  |<#FEF3C7> | Use case khusus Admin (cakupan semua task) |
+  Semua use case selain Login mensyaratkan pengguna sudah login (JWT).
+endlegend
+
+@enduml
