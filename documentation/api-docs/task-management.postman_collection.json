@@ -30,6 +30,10 @@
     {
       "key": "attachment_id",
       "value": "1"
+    },
+    {
+      "key": "upload_id",
+      "value": ""
     }
   ],
   "item": [
@@ -363,7 +367,7 @@
                 }
               ]
             },
-            "description": "multipart/form-data, field `file`. jpg, jpeg, png, webp, pdf, doc, docx, xlsx, txt, mp4, webm; max 20 MB. Returns 201."
+            "description": "Up to 20 MB in one request. Re-uploading the same file name to the same task creates the next version. The response has scan_status = pending; the scan and thumbnail run on the queue."
           },
           "event": [
             {
@@ -398,7 +402,56 @@
                 "{{attachment_id}}",
                 "download"
               ]
-            }
+            },
+            "description": "Returns the file with its original name. 423 while the virus scan is still running, 410 if the file was quarantined."
+          }
+        },
+        {
+          "name": "Attachment thumbnail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/attachments/{{attachment_id}}/thumbnail",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "attachments",
+                "{{attachment_id}}",
+                "thumbnail"
+              ]
+            },
+            "description": "320px WebP preview for images. 404 until the GenerateThumbnail job has run (or for non-images)."
+          }
+        },
+        {
+          "name": "Attachment versions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/attachments/{{attachment_id}}/versions",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "attachments",
+                "{{attachment_id}}",
+                "versions"
+              ]
+            },
+            "description": "Every version of this file within its task, newest first."
           }
         },
         {
@@ -422,6 +475,144 @@
               ]
             },
             "description": "Same permission as updating the task. Returns 204."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Chunked upload",
+      "description": "For files over 20 MB (up to 500 MB). Start the upload, send each 5 MB chunk with its index, then complete. In Postman, select a chunk file (a slice of the original) for each Send chunk call; the frontend slices files automatically.",
+      "item": [
+        {
+          "name": "Start chunked upload",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/tasks/{{task_id}}/attachments/chunked",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "tasks",
+                "{{task_id}}",
+                "attachments",
+                "chunked"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"file_name\": \"big-video.mp4\",\n  \"file_size\": 62914560\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Returns upload_id, chunk_size (5 MB) and total_chunks. The upload_id is stored in the collection variable automatically."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body.upload_id) pm.collectionVariables.set('upload_id', body.upload_id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Send chunk",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/uploads/{{upload_id}}/chunks",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "uploads",
+                "{{upload_id}}",
+                "chunks"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "index",
+                  "value": "0",
+                  "type": "text"
+                },
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "description": "index is 0-based. Re-sending the same index overwrites it, so a failed chunk can simply be retried."
+          }
+        },
+        {
+          "name": "Complete chunked upload",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/uploads/{{upload_id}}/complete",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "uploads",
+                "{{upload_id}}",
+                "complete"
+              ]
+            },
+            "description": "Assembles the chunks, validates the real file type and size, and creates the attachment (versioning, scan and thumbnail as for a normal upload). 422 lists missing chunks."
+          }
+        },
+        {
+          "name": "Abort chunked upload",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/uploads/{{upload_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "uploads",
+                "{{upload_id}}"
+              ]
+            },
+            "description": "Discards the stored chunks."
           }
         }
       ]
@@ -513,6 +704,44 @@
               ]
             },
             "description": "Compact list for assignee dropdowns."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Realtime",
+      "description": "WebSocket channels are served by Laravel Reverb (ws://localhost:8080). Laravel Echo calls this endpoint to authorise private and presence channels with the same JWT.",
+      "item": [
+        {
+          "name": "Authorize channel",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/broadcasting/auth",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "broadcasting",
+                "auth"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"socket_id\": \"1234.5678\",\n  \"channel_name\": \"private-task.{{task_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Channels: private-tasks, private-task.{id}, private-App.Models.User.{id}, presence-online, presence-task-viewers.{id}. Returns {auth} (and channel_data for presence channels), or 403."
           }
         }
       ]

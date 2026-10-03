@@ -51,17 +51,17 @@ Semua endpoint diawali `/api`.
 
 | ID | Nama | Aktor | Deskripsi singkat | Referensi |
 |---|---|---|---|---|
-| UC-15 | Melihat Lampiran (dengan pratinjau) | Member, Admin | Dipanggil oleh UC-08. Menampilkan daftar lampiran task dengan nama, ukuran, dan tanggal. File gambar tampil sebagai pratinjau kecil, dan file lain sebagai label tipe (PDF, DOC, dst). | data lampiran di `GET /tasks/{id}`, [`AttachmentList.tsx`](../frontend/src/components/tasks/AttachmentList.tsx), [`AttachmentThumb.tsx`](../frontend/src/components/tasks/AttachmentThumb.tsx) |
-| UC-16 | Mengunduh Lampiran | Member, Admin | Mengunduh file dengan nama aslinya. File disimpan di private storage, jadi hanya bisa diunduh dengan token. | `GET /attachments/{id}/download`, `TaskAttachmentController@download` |
-| UC-17 | Mengelola Lampiran Task Sendiri / yang Ditugaskan (unggah, hapus) | Member | Mengunggah file (drag-and-drop atau pilih file, dengan progress bar) dan menghapus lampiran pada task yang dibuat oleh atau ditugaskan kepada pengguna. Mengunggah selalu *include* UC-19. | `POST /tasks/{id}/attachments`, `DELETE /attachments/{id}`, `TaskPolicy::update()`, [`AttachmentUploader.tsx`](../frontend/src/components/tasks/AttachmentUploader.tsx) |
+| UC-15 | Melihat Lampiran (dengan pratinjau) | Member, Admin | Dipanggil oleh UC-08. Menampilkan daftar lampiran task (versi terbaru tiap file) dengan nama, ukuran, dan tanggal. File gambar tampil sebagai thumbnail yang dibuat server, dan file lain sebagai label tipe (PDF, DOC, dst). File yang sedang dipindai berlabel "Scanning…", file berbahaya berlabel "Quarantined". | data lampiran di `GET /tasks/{id}`, [`AttachmentList.tsx`](../frontend/src/components/tasks/AttachmentList.tsx), [`AttachmentThumb.tsx`](../frontend/src/components/tasks/AttachmentThumb.tsx) |
+| UC-16 | Mengunduh Lampiran | Member, Admin | Mengunduh file dengan nama aslinya. File disimpan di private storage, jadi hanya bisa diunduh dengan token, dan hanya setelah lolos virus scan. | `GET /attachments/{id}/download`, `TaskAttachmentController@download` |
+| UC-17 | Mengelola Lampiran Task Sendiri / yang Ditugaskan (unggah, hapus) | Member | Mengunggah file (drag-and-drop atau pilih file, dengan progress bar) dan menghapus lampiran pada task yang dibuat oleh atau ditugaskan kepada pengguna. File di atas 20 MB otomatis diunggah per potongan. Mengunggah file dengan nama yang sama menjadi versi baru. Mengunggah selalu *include* UC-19. | `POST /tasks/{id}/attachments`, endpoint chunked (`/tasks/{id}/attachments/chunked`, `/uploads/{id}/...`), `DELETE /attachments/{id}`, `TaskPolicy::update()`, [`AttachmentUploader.tsx`](../frontend/src/components/tasks/AttachmentUploader.tsx) |
 | UC-18 | Mengelola Lampiran Task Siapa Pun (unggah, hapus) | Admin | Sama dengan UC-17, tapi berlaku untuk semua task. | endpoint yang sama, `TaskPolicy::update()` (`isAdmin()`) |
-| UC-19 | Memvalidasi File (tipe, maks 20 MB) | (sistem) | Dipanggil oleh UC-17 dan UC-18. Hanya menerima jpg, jpeg, png, webp, pdf, doc, docx, xlsx, txt, mp4, webm, dengan ukuran maksimal 20 MB. Dicek di browser untuk umpan balik cepat dan di server sebagai penentu akhir (422). | [`StoreAttachmentRequest`](../backend/app/Http/Requests/StoreAttachmentRequest.php), `validate()` di [`AttachmentUploader.tsx`](../frontend/src/components/tasks/AttachmentUploader.tsx) |
+| UC-19 | Memvalidasi File (tipe, maks 500 MB) | (sistem) | Dipanggil oleh UC-17 dan UC-18. Hanya menerima jpg, jpeg, png, webp, pdf, doc, docx, xlsx, txt, mp4, webm. Maksimal 20 MB per unggahan biasa dan 500 MB lewat chunked upload. Tipe dicek dari isi file, di browser untuk umpan balik cepat dan di server sebagai penentu akhir (422). Setelah tersimpan, file dipindai virus dan (untuk gambar) dibuatkan thumbnail di latar belakang. | [`StoreAttachmentRequest`](../backend/app/Http/Requests/StoreAttachmentRequest.php), [`ChunkedUploadController`](../backend/app/Http/Controllers/ChunkedUploadController.php), job [`ScanAttachment`](../backend/app/Jobs/ScanAttachment.php) dan [`GenerateThumbnail`](../backend/app/Jobs/GenerateThumbnail.php), `validate()` di [`AttachmentUploader.tsx`](../frontend/src/components/tasks/AttachmentUploader.tsx) |
 
 ### Komentar
 
 | ID | Nama | Aktor | Deskripsi singkat | Referensi |
 |---|---|---|---|---|
-| UC-20 | Melihat Komentar | Member, Admin | Menampilkan komentar sebuah task secara kronologis, lengkap dengan nama penulis dan waktunya. | `GET /tasks/{id}/comments`, `TaskCommentController@index`, [`CommentSection.tsx`](../frontend/src/components/tasks/CommentSection.tsx) |
+| UC-20 | Melihat Komentar | Member, Admin | Menampilkan komentar sebuah task secara kronologis, lengkap dengan nama penulis dan waktunya. Komentar baru dari pengguna lain langsung muncul tanpa refresh. | `GET /tasks/{id}/comments`, `TaskCommentController@index`, [`CommentSection.tsx`](../frontend/src/components/tasks/CommentSection.tsx) |
 | UC-21 | Menambah Komentar | Member, Admin | Menulis komentar pada task mana pun (maks 2000 karakter). | `POST /tasks/{id}/comments`, `TaskCommentController@store`, [`StoreCommentRequest`](../backend/app/Http/Requests/StoreCommentRequest.php) |
 
 ## Relasi antar use case
@@ -94,6 +94,18 @@ Ringkasan dari [`TaskPolicy`](../backend/app/Policies/TaskPolicy.php). API meneg
 |---|---|
 | Filter berdasarkan assignee | `GET /tasks?assigned_user_id={id}` sudah didukung backend ([`IndexTaskRequest`](../backend/app/Http/Requests/IndexTaskRequest.php), `Task::scopeFilter()`), tapi halaman `/tasks` belum punya dropdown Assignee. Filter ini hanya bisa dipakai lewat Postman atau curl. |
 | Jumlah data per halaman | `per_page` (1–50) bisa diatur lewat API, sedangkan UI selalu memakai 10. |
+| Riwayat versi lampiran | `GET /attachments/{id}/versions` mengembalikan semua versi sebuah file, dan setiap versi bisa diunduh. UI hanya menampilkan versi terbaru. |
+
+### Perilaku sistem, bukan use case
+
+Fitur berikut mengubah **cara** sistem menampilkan data, bukan **apa** yang dilakukan aktor, sehingga tidak digambar sebagai use case tersendiri:
+
+| Fitur | Keterangan |
+|---|---|
+| Pembaruan real-time | Perubahan task, komentar, status lampiran, dan role pengguna langsung tampil di semua jendela yang terbuka (Laravel Reverb). |
+| Status online dan "Also viewing" | Header menampilkan jumlah pengguna online; detail task menampilkan siapa lagi yang sedang membukanya. |
+| Indikator mengetik | "X is typing…" saat pengguna lain menulis komentar pada task yang sama. |
+| Virus scan dan thumbnail | Proses latar belakang (queue) setelah UC-19; aktor tidak memicunya secara langsung. |
 
 ### Belum diimplementasikan
 
@@ -101,15 +113,13 @@ Ringkasan dari [`TaskPolicy`](../backend/app/Policies/TaskPolicy.php). API meneg
 |---|---|
 | Registrasi akun | Tidak ada endpoint maupun halaman. Akun dibuat lewat seeder. |
 | Lupa / reset password | Tabel `password_reset_tokens` bawaan Laravel ada, tapi tidak ada route atau halamannya. |
-| Manajemen pengguna dan role | Tidak ada CRUD user. `GET /users` hanya dipakai untuk dropdown assignee. |
+| Manajemen pengguna dan role | Tidak ada CRUD user di aplikasi. `GET /users` hanya dipakai untuk dropdown assignee. Role diubah oleh pengelola sistem lewat `php artisan user:role {email} {role}`, dan sesi pengguna yang terbuka langsung menyesuaikan. |
 | Mengubah / menghapus komentar | Komentar hanya bisa dibuat dan dilihat (`task_comments` tidak punya `updated_at`). |
 
 ### Ditunda (lihat [architecture.md](architecture.md#deferred-features))
 
-- Real-time: WebSocket/SSE, status online, indikator mengetik
 - Queue job: email saat task ditugaskan, bulk update status, ekspor CSV/PDF
-- Thumbnail di sisi server, simulasi virus scan, chunked upload (> 50 MB), versioning file
-- Video streaming dan adaptive streaming
+- Video streaming, thumbnail video, dan adaptive streaming
 - Caching (Redis)
 
 ## Render diagram

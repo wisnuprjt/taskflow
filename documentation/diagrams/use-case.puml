@@ -59,7 +59,7 @@ rectangle "TaskFlow" {
     usecase "Mengunduh Lampiran" as UC16
     usecase "Mengelola Lampiran\nTask Sendiri / yang Ditugaskan\n(unggah, hapus)" as UC17
     usecase "Mengelola Lampiran\nTask Siapa Pun\n(unggah, hapus)" as UC18 <<admin>>
-    usecase "Memvalidasi File\n(tipe, maks 20 MB)" as UC19
+    usecase "Memvalidasi File\n(tipe, maks 500 MB)" as UC19
   }
 
   package "Komentar" {
